@@ -1,0 +1,44 @@
+log:
+  debug: true
+  log_level: DEBUG # logging.
+
+active_preset: obs_outside
+
+presets:
+  camera_inside:
+    source: 0
+    close_view: true
+  camera_outside:
+    source: 0
+    close_view: false
+  obs_inside:
+    source: 2
+    close_view: true
+  obs_outside:
+    source: 2
+    close_view: false
+  other_inside:
+    source: '../osaka.gif'
+    close_view: true
+  other_outside:
+    source: '../osaka.gif'
+    close_view: false  
+
+preprocess:
+  dilatation_size: 3
+  dilatation_shape: MORPH_DILATE # cv.
+
+motionManager:
+  motion_threshold: 100
+  drop_cam_thresh: 3
+  shift_cam_thresh: 5
+
+tracker:
+  model_path: '../yolov8n.pt'
+  track_classes: [0] # people
+
+timers:
+  cam_reset_check_time: 3
+  motion_check_time: 3
+  drop_check_time: 10 # in production would be hour
+  gone_check_time: 3
