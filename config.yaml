@@ -1,32 +1,26 @@
 log:
   debug: true
-  log_level: DEBUG # logging.
+  log_level: DEBUG # from logging library
 
 active_preset: obs_outside
 
 presets:
   camera_inside:
-    source: 0
+    source: 0 # connected webcam
     close_view: true
   camera_outside:
-    source: 0
+    source: 0 # connected webcam
     close_view: false
   obs_inside:
-    source: 2
+    source: 2 # OBS webcam
     close_view: true
   obs_outside:
-    source: 2
+    source: 2 # OBS webcam
     close_view: false
-  other_inside:
-    source: '../osaka.gif'
-    close_view: true
-  other_outside:
-    source: '../osaka.gif'
-    close_view: false  
 
 preprocess:
   dilatation_size: 3
-  dilatation_shape: MORPH_DILATE # cv.
+  dilatation_shape: MORPH_DILATE # from OpenCV library
 
 motionManager:
   motion_threshold: 100
@@ -34,11 +28,11 @@ motionManager:
   shift_cam_thresh: 5
 
 tracker:
-  model_path: '../yolov8n.pt'
+  model_path: 'yolov8n.pt'
   track_classes: [0] # people
 
 timers:
   cam_reset_check_time: 3
   motion_check_time: 3
-  drop_check_time: 10 # in production would be hour
+  drop_check_time: 10 # low value just for testing, much bigger value is advised
   gone_check_time: 3
