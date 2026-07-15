@@ -8,22 +8,25 @@ import yaml
 
 class Config:    
     def __init__(self):
-        with open("main/config.yaml") as f:
+        with open("config.yaml") as f:
             config = yaml.safe_load(f)
             
         active_preset = config["active_preset"]
         self.source = config["presets"][active_preset]["source"]
         self.close_view = config["presets"][active_preset]["close_view"]
         
-        if not self.close_view:
-            self.min_variance = 100
-            self.max_variance = 2000
-        else:
+        if self.close_view:
             self.min_variance = 2000
             self.max_variance = 8000
+        else:
+            self.min_variance = 100
+            self.max_variance = 2000
         # preprocess
         self.dilatation_size = config["preprocess"]["dilatation_size"]
-        self.dilatation_shape = getattr(cv, config["preprocess"]["dilatation_shape"])   
+        try:
+            self.dilatation_shape = getattr(cv, config["preprocess"]["dilatation_shape"])
+        except AttributeError:
+            raise AttributeError(f'Configuration Error:\n Unknown Dilatation Shape: "{config["preprocess"]["dilatation_shape"]}".')
         # motionManager
         self.motion_threshold = config["motionManager"]["motion_threshold"]
         self.small_cam_mov_thresh = config["motionManager"]["drop_cam_thresh"]  
@@ -38,11 +41,14 @@ class Config:
         self.gone_check_time = config["timers"]["gone_check_time"]        
         # logging
         self.debug = config["log"]["debug"]
-        self.log_level = getattr(logging, config["log"]["log_level"])
+        try:
+            self.log_level = getattr(logging, config["log"]["log_level"])
+        except AttributeError:
+            raise AttributeError(f'Configuration Error:\n Unknown Log Level: "{config["log"]["log_level"]}".')
         logging.basicConfig(level=self.log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class Camera:
-    # camera handling (open / restart / read)
+    # camera handling (open / restart / read / validate)
     def __init__(self, config):
         self.config = config
         self.source = config.source
@@ -120,10 +126,8 @@ class ROIManager:
         y1 = min(self.p1[1], self.p2[1])
         y2 = max(self.p1[1], self.p2[1])
         
-        # BUG HAVE TO REFACTOR FOR CLARITY
-        roi = ready_frame[y1:y2, x1:x2] # lines in the array [row:row, col:col]
+        roi = ready_frame[y1:y2, x1:x2] # [row:row, col:col]
         real_roi = real_frame[y1:y2, x1:x2]
-        # logging.info('ROI Cut Propperly')
         return roi, real_roi
     
     def has_roi(self):
@@ -182,19 +186,14 @@ class MotionDetector:
     
     def detect_camera_shift(self, prev_gray, cur_gray):
         threshold = self.big_cam_mov_thresh
-        # if not self.prev_points:
-        #     return self.prev_points
         
         cur_points, status, err = cv.calcOpticalFlowPyrLK(
             prev_gray, cur_gray, self.prev_points, None, 
             winSize=(15, 15), maxLevel=2, 
             criteria=(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03))
         
-        good_new = cur_points[status==1] # 1 - True; tracking succesful
+        good_new = cur_points[status==1] # tracking succesful
         good_old = self.prev_points[status==1]
-        
-        # if len(good_new) == 0:
-        #     return self.prev_points
         
         dx = good_new[:, 0] - good_old[:, 0]
         dy = good_new[:, 1] - good_old[:, 1]
@@ -221,7 +220,7 @@ class MotionDetector:
             winSize=(15, 15), maxLevel=2, 
             criteria=(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03))
         
-        good_new = cur_points[status==1] # 1 - True; tracking succesful
+        good_new = cur_points[status==1] # tracking succesful
         good_old = self.defined_points[status==1]
         
         dx = good_new[:, 0] - good_old[:, 0]
@@ -244,9 +243,6 @@ class MotionDetector:
             else:
                 direction = "UNKNOWN"
             logging.warning(f'Camera Dropped {direction}')
-        #     return True, direction
-        
-        # return False, None
 
 class Tracker:
     # YOLO tracking
@@ -256,7 +252,7 @@ class Tracker:
         self.model = YOLO(self.config.model_path)
         self.track_classes = self.config.track_classes
 
-    def tracking(self, frame): # better track on the whole frame, not just ROI
+    def tracking(self, frame): # better to track on the whole frame, not just ROI
         track_result = self.model.track(frame, persist=True, classes=self.track_classes)[0]
 
         if track_result.boxes and track_result.boxes.is_track:
@@ -266,16 +262,16 @@ class Tracker:
 
             frame = track_result.plot()
 
-            # Plot the tracks
+            # plot the tracks
             for box, track_id in zip(track_boxes, track_ids):
                 x, y, w, h = box
                 track = self.track_history[track_id]
-                track.append((float(x), float(y)))  # x, y center point
+                track.append((float(x), float(y)))  # (x, y) of center point
                 
                 if len(track) > 30:  # retain 30 tracks for 30 frames
                     track.pop(0)
 
-                # Draw the tracking lines
+                # draw the tracking lines
                 points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
                 cv.polylines(frame, [points], isClosed=False, color=(230, 230, 230), thickness=10)
         return frame
@@ -341,7 +337,7 @@ class App:
             cv.putText(frame, f"{frame.shape[1]}x{frame.shape[0]} FPS:{int(self.fps)}", (100, 90), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             cv.imshow('Normal View', frame)
 
-            if cv.waitKey(30) == ord('q'): # how long (in ms - 1/1000s) to wait between each frame
+            if cv.waitKey(30) == ord('q'): # in ms - 1/1000s 
                 break
     
 def main():
