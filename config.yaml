@@ -22,6 +22,14 @@ preprocess:
   dilatation_size: 3
   dilatation_shape: MORPH_DILATE # from OpenCV library
 
+variance:
+  close:
+    min: 2000
+    max: 8000
+  far:
+    min: 100
+    max: 2000
+
 motionManager:
   motion_threshold: 100
   drop_cam_thresh: 3
