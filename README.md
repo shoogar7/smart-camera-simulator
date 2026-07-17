@@ -1,4 +1,4 @@
-# Smart Camera Simulator
+# Smart Camera System
 
 A computer vision application for intelligent camera monitoring, motion detection, camera tamper detection, and object tracking.
 
@@ -114,34 +114,22 @@ Motion Detection
 
 ### Clone Repository
 
-```bash
-git clone https://github.com/shoogar7/smart-camera-simulator.git
-cd smart-camera-simulator
+```
+git clone https://github.com/shoogar7/smart-camera-system.git
+cd smart-camera-system
 ```
 
 ### Create Virtual Environment
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
 ```
-
-Windows:
-
-```powershell
+python -m venv venv
 .venv\Scripts\activate
 ```
 
 ### Install Dependencies
 
-```bash
-pip install -r requirements_lin.txt
 ```
-
-Windows:
-
-```powershell
-pip install -r requirements_win.txt
+pip install -r requirements.txt
 ```
 
 ---
@@ -150,13 +138,13 @@ pip install -r requirements_win.txt
 
 Configuration is loaded from:
 
-```text
+```
 config.yaml
 ```
 
 Example:
 
-```yaml
+```
 
 tracker:
   model_path: yolov8n.pt
@@ -172,8 +160,8 @@ motionManager:
 
 Run:
 
-```bash
-python main.py
+```
+python src/main.py
 ```
 
 Two windows will appear:
@@ -229,7 +217,7 @@ The application provides detailed logging for:
 
 Example:
 
-```text
+```
 WARNING - Motion Detected in ROI
 WARNING - Camera Shifted
 INFO    - Tracking
