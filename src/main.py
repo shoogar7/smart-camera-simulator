@@ -1,13 +1,13 @@
 import cv2 as cv
 import logging
-import config
-import app
+from config import Config
+from app import App
 
 def main():
-    cfg = config.Config()
+    cfg = Config()
     logging.basicConfig(level=cfg.log_level, format='%(asctime)s - %(levelname)s - %(message)s')
     
-    app.App(cfg).run()
+    App(cfg).run()
     cv.destroyAllWindows()
 
 if __name__ == '__main__':

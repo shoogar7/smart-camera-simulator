@@ -3,16 +3,17 @@ import logging
 from ultralytics import YOLO
 from collections import defaultdict
 import numpy as np
+from config import Config
 
 class Tracker:
     # YOLO tracking
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.config = config
         self.track_history = defaultdict(lambda: [])
         self.model = YOLO(self.config.model_path)
         self.track_classes = self.config.track_classes
 
-    def tracking(self, frame): # better to track on the whole frame, not just ROI
+    def tracking(self, frame: np.ndarray) -> np.ndarray: # better to track on the whole frame, not just ROI
         track_result = self.model.track(frame, persist=True, classes=self.track_classes)[0]
 
         if track_result.boxes and track_result.boxes.is_track:

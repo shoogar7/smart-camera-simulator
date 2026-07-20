@@ -1,28 +1,29 @@
 import cv2 as cv
 import time
-import camera
-import roi_manager
-import motion_detector
-import tracker
+from camera import Camera
+from roi_manager import ROIManager
+from motion_detector import MotionDetector
+from tracker import Tracker
+from config import Config
 
 class App:
     # orchestration of main loop
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.config = config
-        self.camera = camera.Camera(config)
-        self.roi_manager = roi_manager.ROIManager(config)
-        self.motion_detector = motion_detector.MotionDetector(config)
-        self.tracker = tracker.Tracker(config)
+        self.camera = Camera(config)
+        self.roi_manager = ROIManager(config)
+        self.motion_detector = MotionDetector(config)
+        self.tracker = Tracker(config)
         
         self.start = time.time()
         self.fps = None
         
-    def calc_fps(self):
+    def calc_fps(self) -> None:
         self.stop = time.time()
         self.fps = 1 / (self.stop - self.start)
         self.start = self.stop
     
-    def run(self):
+    def run(self) -> None:
         cv.namedWindow('Normal View')
         cv.namedWindow('Detection View')
         cv.setMouseCallback('Normal View', self.roi_manager.on_mouse)

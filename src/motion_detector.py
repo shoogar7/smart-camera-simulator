@@ -2,10 +2,11 @@ import cv2 as cv
 import numpy as np
 import logging
 import time
+from config import Config
 
 class MotionDetector:
     # motion + optical flow
-    def __init__(self, config):
+    def __init__(self, config: Config):
         self.config = config
         self.motion_threshold = self.config.motion_threshold
         self.small_cam_mov_thresh = self.config.small_cam_mov_thresh
@@ -24,12 +25,12 @@ class MotionDetector:
         self.last_motion_time = time.time()
         self.last_drop_time = time.time()
         
-    def initialize(self, cur_frame):
+    def initialize(self, cur_frame: np.ndarray) -> None:
         self.prev_points = cv.goodFeaturesToTrack(cur_frame, 50, 0.01, 7) # points for camera shift detection
         self.defined_points = cv.goodFeaturesToTrack(cur_frame, 100, 0.01, 7) # points for camera drop detection
         self.defined_frame = cur_frame
     
-    def preprocess(self, cur_frame, prev_frame):
+    def preprocess(self, cur_frame: np.ndarray, prev_frame: np.ndarray) -> np.ndarray:
         dest_frame = cv.absdiff(cur_frame, prev_frame)
         threshold = cv.threshold(dest_frame, 63, 255, cv.THRESH_BINARY)
 
@@ -43,7 +44,7 @@ class MotionDetector:
         
         return dilatation_dst
     
-    def detect_motion(self, det_roi):
+    def detect_motion(self, det_roi: np.ndarray) -> bool:
         motion_level = np.count_nonzero(det_roi) 
         if motion_level > self.motion_threshold:
             self.last_motion_time = time.time()
@@ -52,7 +53,7 @@ class MotionDetector:
             return True
         return False
     
-    def detect_camera_shift(self, prev_gray, cur_gray):
+    def detect_camera_shift(self, prev_gray: np.ndarray, cur_gray: np.ndarray) -> bool:
         threshold = self.big_cam_mov_thresh
         
         cur_points, status, err = cv.calcOpticalFlowPyrLK(
@@ -81,7 +82,7 @@ class MotionDetector:
         
         return False
             
-    def detect_camera_drop(self, cur_frame):
+    def detect_camera_drop(self, cur_frame: np.ndarray) -> None:
         threshold = self.small_cam_mov_thresh
         cur_points, status, err = cv.calcOpticalFlowPyrLK(
             self.defined_frame, cur_frame, self.defined_points, None, 
