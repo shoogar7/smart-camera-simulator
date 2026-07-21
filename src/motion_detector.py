@@ -44,10 +44,12 @@ class MotionDetector:
         self.last_drop_time = time.time()
         
     def initialize(self, cur_frame: np.ndarray) -> None:
+        # points for camera shift detection
         self.prev_points = cv.goodFeaturesToTrack(cur_frame, MotionDetector.PREV_POINT_MAX_CORNERS,
-            MotionDetector.PREV_POINT_QUALITY_LEVEL, MotionDetector.PREV_POINT_MIN_DISTANCE) # points for camera shift detection
+            MotionDetector.PREV_POINT_QUALITY_LEVEL, MotionDetector.PREV_POINT_MIN_DISTANCE) 
+        # points for camera drop detection
         self.defined_points = cv.goodFeaturesToTrack(cur_frame, MotionDetector.DEFINED_POINT_MAX_CORNERS,
-            MotionDetector.DEFINED_POINT_QUALITY_LEVEL, MotionDetector.DEFINED_POINT_MIN_DISTANCE) # points for camera drop detection
+            MotionDetector.DEFINED_POINT_QUALITY_LEVEL, MotionDetector.DEFINED_POINT_MIN_DISTANCE) 
         self.defined_frame = cur_frame
     
     def preprocess(self, cur_frame: np.ndarray, prev_frame: np.ndarray) -> np.ndarray:
@@ -75,20 +77,28 @@ class MotionDetector:
             return True
         return False
     
-    def detect_camera_shift(self, prev_gray: np.ndarray, cur_gray: np.ndarray) -> bool:
-        threshold = self.big_cam_mov_thresh
-        
+    def _calculate_displacement(self, prev_img: np.ndarray, cur_img: np.ndarray, points: np.ndarray) -> tuple[float, float, np.ndarray]:
         cur_points, status, err = cv.calcOpticalFlowPyrLK(
-            prev_gray, cur_gray, self.prev_points, None, **MotionDetector.LK_PARAMS)
-        
-        good_new = cur_points[status==1] # tracking succesful
-        good_old = self.prev_points[status==1]
+            prev_img, cur_img, points, None, **MotionDetector.LK_PARAMS)
+
+        if status is None:
+            return 0.0, 0.0, np.array([])
+
+        good_new = cur_points[status == 1] # tracking succesful
+        good_old = points[status == 1]
+
+        if len(good_new) == 0:
+            return 0.0, 0.0, good_new
         
         dx = good_new[:, 0] - good_old[:, 0]
         dy = good_new[:, 1] - good_old[:, 1]
         
-        mean_dx = np.mean(dx)
-        mean_dy = np.mean(dy)
+        return np.mean(dx), np.mean(dy), good_new
+        
+    def detect_camera_shift(self, prev_gray: np.ndarray, cur_gray: np.ndarray) -> bool:
+        threshold = self.big_cam_mov_thresh
+        
+        mean_dx, mean_dy, good_new = self._calculate_displacement(prev_gray, cur_gray, self.prev_points)
 
         if len(self.prev_points) < MotionDetector.PREV_POINT_LIMIT:
             self.prev_points = cv.goodFeaturesToTrack(prev_gray, MotionDetector.PREV_POINT_MAX_CORNERS,
@@ -100,34 +110,22 @@ class MotionDetector:
             logging.debug(f"mean_dx: {abs(mean_dx)} | mean_dy: {abs(mean_dy)}")
             logging.warning('Camera Shifted')
             return True
-        
         return False
             
     def detect_camera_drop(self, cur_frame: np.ndarray) -> None:
         threshold = self.small_cam_mov_thresh
-        cur_points, status, err = cv.calcOpticalFlowPyrLK(
-            self.defined_frame, cur_frame, self.defined_points, None, **MotionDetector.LK_PARAMS)
         
-        good_new = cur_points[status==1] # tracking succesful
-        good_old = self.defined_points[status==1]
+        mean_dx, mean_dy, _ = self._calculate_displacement(self.defined_frame, cur_frame, self.defined_points)
         
-        dx = good_new[:, 0] - good_old[:, 0]
-        dy = good_new[:, 1] - good_old[:, 1]
-        
-        mean_dx = np.mean(dx)
-        mean_dy = np.mean(dy)
-
         if abs(mean_dx) > threshold or abs(mean_dy) > threshold:
             self.last_drop_time = time.time()
             logging.debug(f"mean_dx: {abs(mean_dx)} | mean_dy: {abs(mean_dy)}")
-            if mean_dx > threshold:
-                direction = "RIGHT"
-            elif mean_dx < -threshold:
-                direction = "LEFT"
-            elif mean_dy > threshold:
-                direction = "UP"
-            elif mean_dy < -threshold:
-                direction = "DOWN"
-            else:
-                direction = "UNKNOWN"
+            direction = self._define_direction(mean_dx, mean_dy, threshold)
             logging.warning(f'Camera Dropped {direction}')
+            
+    def _define_direction(self, mean_dx: float, mean_dy: float, threshold: float) -> str:
+        if mean_dx > threshold: return "RIGHT"
+        if mean_dx < -threshold: return "LEFT"
+        if mean_dy > threshold: return "UP"
+        if mean_dy < -threshold: return "DOWN"
+        return "UNKNOWN"
