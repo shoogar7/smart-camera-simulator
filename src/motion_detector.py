@@ -4,35 +4,56 @@ import logging
 import time
 from config import Config
 
+# motion + optical flow
 class MotionDetector:
-    # motion + optical flow
+    LK_PARAMS = dict(winSize = (15,15), maxLevel = 2,
+            criteria = (cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03))
+    PREV_POINT_LIMIT = 20
+    CONTOUR_ID = -1
+    CONTOUR_COLOR = (0, 255, 0)
+    CONTOUR_THICKNESS = 3
+    
+    PREV_POINT_MAX_CORNERS = 50
+    PREV_POINT_QUALITY_LEVEL = 0.01
+    PREV_POINT_MIN_DISTANCE = 7
+    
+    DEFINED_POINT_MAX_CORNERS = 100
+    DEFINED_POINT_QUALITY_LEVEL = 0.01
+    DEFINED_POINT_MIN_DISTANCE = 7
+    
+    THRESHOLD_VALUE = 63
+    THRESHOLD_MAX = 255
+
     def __init__(self, config: Config):
         self.config = config
-        self.motion_threshold = self.config.motion_threshold
-        self.small_cam_mov_thresh = self.config.small_cam_mov_thresh
-        self.big_cam_mov_thresh = self.config.big_cam_mov_thresh
+        self.motion_threshold = config.motion_threshold
+        self.small_cam_mov_thresh = config.small_cam_mov_thresh
+        self.big_cam_mov_thresh = config.big_cam_mov_thresh
         
-        self.dilatation_shape = self.config.dilatation_shape
-        self.dilatation_size = self.config.dilatation_size
+        self.dilatation_shape = config.dilatation_shape
+        self.dilatation_size = config.dilatation_size
         
         self.prev_points = None
         self.defined_points = None
         self.defined_frame = None
         
-        self.motion_check_time = self.config.motion_check_time
-        self.drop_check_time = self.config.drop_check_time
+        self.motion_check_time = config.motion_check_time
+        self.drop_check_time = config.drop_check_time
         
         self.last_motion_time = time.time()
         self.last_drop_time = time.time()
         
     def initialize(self, cur_frame: np.ndarray) -> None:
-        self.prev_points = cv.goodFeaturesToTrack(cur_frame, 50, 0.01, 7) # points for camera shift detection
-        self.defined_points = cv.goodFeaturesToTrack(cur_frame, 100, 0.01, 7) # points for camera drop detection
+        self.prev_points = cv.goodFeaturesToTrack(cur_frame, MotionDetector.PREV_POINT_MAX_CORNERS,
+            MotionDetector.PREV_POINT_QUALITY_LEVEL, MotionDetector.PREV_POINT_MIN_DISTANCE) # points for camera shift detection
+        self.defined_points = cv.goodFeaturesToTrack(cur_frame, MotionDetector.DEFINED_POINT_MAX_CORNERS,
+            MotionDetector.DEFINED_POINT_QUALITY_LEVEL, MotionDetector.DEFINED_POINT_MIN_DISTANCE) # points for camera drop detection
         self.defined_frame = cur_frame
     
     def preprocess(self, cur_frame: np.ndarray, prev_frame: np.ndarray) -> np.ndarray:
         dest_frame = cv.absdiff(cur_frame, prev_frame)
-        threshold = cv.threshold(dest_frame, 63, 255, cv.THRESH_BINARY)
+        threshold = cv.threshold(dest_frame, MotionDetector.THRESHOLD_VALUE, 
+                                 MotionDetector.THRESHOLD_MAX, cv.THRESH_BINARY)
 
         element = cv.getStructuringElement(self.dilatation_shape, 
                                            (2 * self.dilatation_size + 1, 2 * self.dilatation_size + 1), 
@@ -40,7 +61,8 @@ class MotionDetector:
         dilatation_dst = cv.dilate(threshold[1], element)
 
         contours, _ = cv.findContours(dilatation_dst, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-        cv.drawContours(dilatation_dst, contours, -1, (0, 255, 0), 3)
+        cv.drawContours(dilatation_dst, contours, MotionDetector.CONTOUR_ID, 
+                        MotionDetector.CONTOUR_COLOR, MotionDetector.CONTOUR_THICKNESS)
         
         return dilatation_dst
     
@@ -57,9 +79,7 @@ class MotionDetector:
         threshold = self.big_cam_mov_thresh
         
         cur_points, status, err = cv.calcOpticalFlowPyrLK(
-            prev_gray, cur_gray, self.prev_points, None, 
-            winSize=(15, 15), maxLevel=2, 
-            criteria=(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03))
+            prev_gray, cur_gray, self.prev_points, None, **MotionDetector.LK_PARAMS)
         
         good_new = cur_points[status==1] # tracking succesful
         good_old = self.prev_points[status==1]
@@ -70,8 +90,9 @@ class MotionDetector:
         mean_dx = np.mean(dx)
         mean_dy = np.mean(dy)
 
-        if len(self.prev_points) < 20:
-            self.prev_points = cv.goodFeaturesToTrack(prev_gray, 50, 0.01, 7)
+        if len(self.prev_points) < MotionDetector.PREV_POINT_LIMIT:
+            self.prev_points = cv.goodFeaturesToTrack(prev_gray, MotionDetector.PREV_POINT_MAX_CORNERS,
+                MotionDetector.PREV_POINT_QUALITY_LEVEL, MotionDetector.PREV_POINT_MIN_DISTANCE) 
         else:
             self.prev_points = good_new.reshape(-1, 1, 2)
             
@@ -85,9 +106,7 @@ class MotionDetector:
     def detect_camera_drop(self, cur_frame: np.ndarray) -> None:
         threshold = self.small_cam_mov_thresh
         cur_points, status, err = cv.calcOpticalFlowPyrLK(
-            self.defined_frame, cur_frame, self.defined_points, None, 
-            winSize=(15, 15), maxLevel=2, 
-            criteria=(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03))
+            self.defined_frame, cur_frame, self.defined_points, None, **MotionDetector.LK_PARAMS)
         
         good_new = cur_points[status==1] # tracking succesful
         good_old = self.defined_points[status==1]
