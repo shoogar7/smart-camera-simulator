@@ -20,10 +20,13 @@ class Camera:
             logging.info('Camera Started')
         else:
             logging.error('Camera Not Starting')
-    
-    def restart(self) -> None:
-        logging.info('Attempting Camera Restart')
+            
+    def release(self) -> None:
         self.cap.release()
+    
+    def _restart(self) -> None:
+        logging.info('Attempting Camera Restart')
+        self.release()
         self.open()
     
     def read(self) -> np.ndarray:
@@ -33,7 +36,7 @@ class Camera:
             if time.time() - self.last_reset_time > self.config.cam_reset_check_time:
                 logging.warning('No Frames Received')
                 self.last_reset_time = time.time()
-                self.restart()
+                self._restart()
                 ret, frame = self.cap.read()
         return frame
     
@@ -42,6 +45,6 @@ class Camera:
         logging.debug(f'Variance Level {variance}')
         if variance == 0:
             logging.error('No Camera Signal')
-            self.restart()
+            self._restart()
         elif variance < self.config.min_variance or variance > self.config.max_variance:  
             logging.warning('View Blocked')
