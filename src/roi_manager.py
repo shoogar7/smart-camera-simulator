@@ -1,20 +1,22 @@
 import cv2 as cv
 import logging
+import numpy as np
+from config import Config
 
 class ROIManager:
-    def __init__(self, config, p1=(0,0), p2=(0,0), state=0):
+    def __init__(self, config: Config, p1: tuple[int ,int]=(0, 0), p2: tuple[int, int]=(0, 0), state: int = 0):
         self.config = config
         self.p1 = p1
         self.p2 = p2
         self.state = state
                 
-    def reset(self):
+    def reset(self) -> None:
         self.p1 = (0,0)
         self.p2 = (0,0)
         self.state = 0
         logging.info('ROI Deleted')
         
-    def on_mouse(self, event, x, y, flags, userdata):
+    def on_mouse(self, event: int, x: int, y: int, flags: int, userdata: object | None) -> None:
         if event == cv.EVENT_LBUTTONUP:
             if self.state == 0:
                 self.p1 = (x, y)
@@ -31,7 +33,7 @@ class ROIManager:
         elif event == cv.EVENT_RBUTTONUP or event == cv.EVENT_LBUTTONDBLCLK:
             self.reset()
             
-    def get_roi(self, ready_frame, real_frame):
+    def get_roi(self, ready_frame: np.ndarray, real_frame: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         # normalization - if user first clicks bottom-right instead of top-left
         x1 = min(self.p1[0], self.p2[0])
         x2 = max(self.p1[0], self.p2[0])
@@ -42,7 +44,5 @@ class ROIManager:
         real_roi = real_frame[y1:y2, x1:x2]
         return roi, real_roi
     
-    def has_roi(self):
-        if self.state == 2:
-            return True
-        return False
+    def has_roi(self) -> bool:
+        return self.state == 2

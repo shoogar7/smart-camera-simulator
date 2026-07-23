@@ -3,16 +3,21 @@ import logging
 from ultralytics import YOLO
 from collections import defaultdict
 import numpy as np
+from config import Config
 
+# tracking objects disturbing ROI
 class Tracker:
-    # YOLO tracking
-    def __init__(self, config):
+    FRAME_TRACK_LIMIT = 30
+    BORDER_COLOR = (230, 230, 230)
+    BORDER_THICKNESS = 10
+    
+    def __init__(self, config: Config):
         self.config = config
         self.track_history = defaultdict(lambda: [])
-        self.model = YOLO(self.config.model_path)
-        self.track_classes = self.config.track_classes
+        self.model = YOLO(config.model_path)
+        self.track_classes = config.track_classes
 
-    def tracking(self, frame): # better to track on the whole frame, not just ROI
+    def tracking(self, frame: np.ndarray) -> np.ndarray: # better to track on the whole frame, not just ROI
         track_result = self.model.track(frame, persist=True, classes=self.track_classes)[0]
 
         if track_result.boxes and track_result.boxes.is_track:
@@ -28,10 +33,10 @@ class Tracker:
                 track = self.track_history[track_id]
                 track.append((float(x), float(y)))  # (x, y) of center point
                 
-                if len(track) > 30:  # retain 30 tracks for 30 frames
+                if len(track) > Tracker.FRAME_TRACK_LIMIT: 
                     track.pop(0)
 
                 # draw the tracking lines
-                points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
-                cv.polylines(frame, [points], isClosed=False, color=(230, 230, 230), thickness=10)
+                points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2)) 
+                cv.polylines(frame, [points], isClosed=False, color=Tracker.BORDER_COLOR, thickness=Tracker.BORDER_THICKNESS)
         return frame
